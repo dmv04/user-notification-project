@@ -6,12 +6,14 @@ import dev.dmv04.userservice.dto.UserDTO;
 import dev.dmv04.userservice.entity.User;
 import dev.dmv04.userservice.exception.EmailAlreadyExistsException;
 import dev.dmv04.userservice.exception.UserNotFoundException;
+import dev.dmv04.userservice.producer.UserEventProducer;
 import dev.dmv04.userservice.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -24,14 +26,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@ActiveProfiles("test")
 class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private UserEventProducer userEventProducer;
+
     @InjectMocks
     private UserService userService;
-
 
     @Test
     void createUser_shouldThrowWhenEmailAlreadyExists() {
@@ -54,6 +59,7 @@ class UserServiceTest {
         savedUser.setEmail("bob@test.com");
         savedUser.setAge(25);
         savedUser.setCreatedAt(LocalDateTime.now());
+
         when(userRepository.existsByEmail("bob@test.com")).thenReturn(false);
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
@@ -66,7 +72,6 @@ class UserServiceTest {
         verify(userRepository).save(any(User.class));
     }
 
-
     @Test
     void updateUser_shouldThrowWhenUserNotFound() {
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
@@ -74,6 +79,7 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.updateUser(999L, new UpdateUserRequest("New", "new@test.com", 30)))
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessage("User with id 999 not found");
+
     }
 
     @Test
@@ -83,6 +89,7 @@ class UserServiceTest {
         existing.setName("Old");
         existing.setEmail("old@test.com");
         existing.setAge(40);
+
         when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(userRepository.existsByEmail("new@test.com")).thenReturn(true);
 
@@ -91,6 +98,7 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.updateUser(1L, request))
                 .isInstanceOf(EmailAlreadyExistsException.class)
                 .hasMessage("Email 'new@test.com' already exists");
+
     }
 
     @Test
@@ -100,6 +108,7 @@ class UserServiceTest {
         existing.setName("Old Name");
         existing.setEmail("old@test.com");
         existing.setAge(30);
+
         when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(userRepository.save(any(User.class))).thenReturn(existing);
 
@@ -119,6 +128,7 @@ class UserServiceTest {
         existing.setName("Old");
         existing.setEmail("old@test.com");
         existing.setAge(40);
+
         when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(userRepository.save(any(User.class))).thenReturn(existing);
 
@@ -138,6 +148,7 @@ class UserServiceTest {
         existing.setName("Old");
         existing.setEmail("old@test.com");
         existing.setAge(40);
+
         when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(userRepository.save(any(User.class))).thenReturn(existing);
 
@@ -148,10 +159,9 @@ class UserServiceTest {
         assertThat(result.age()).isEqualTo(40);
     }
 
-
     @Test
     void deleteUser_shouldThrowWhenUserNotFound() {
-        when(userRepository.existsById(999L)).thenReturn(false);
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.deleteUser(999L))
                 .isInstanceOf(UserNotFoundException.class)
@@ -162,7 +172,13 @@ class UserServiceTest {
 
     @Test
     void deleteUser_shouldCallRepository() {
-        when(userRepository.existsById(1L)).thenReturn(true);
+        User user = new User();
+        user.setId(1L);
+        user.setName("Test");
+        user.setEmail("test@example.com");
+        user.setAge(30);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
         userService.deleteUser(1L);
 
@@ -176,5 +192,6 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.getUserById(999L))
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessage("User with id 999 not found");
+
     }
 }

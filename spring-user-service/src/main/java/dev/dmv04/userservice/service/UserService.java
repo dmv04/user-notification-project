@@ -7,8 +7,8 @@ import dev.dmv04.userservice.dto.UserEvent;
 import dev.dmv04.userservice.entity.User;
 import dev.dmv04.userservice.exception.EmailAlreadyExistsException;
 import dev.dmv04.userservice.exception.UserNotFoundException;
+import dev.dmv04.userservice.producer.UserEventProducer;
 import dev.dmv04.userservice.repository.UserRepository;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,11 +19,11 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final KafkaTemplate<String, UserEvent> kafkaTemplate;
+    private final UserEventProducer userEventProducer;
 
-    public UserService(UserRepository userRepository, KafkaTemplate<String, UserEvent> kafkaTemplate) {
+    public UserService(UserRepository userRepository, UserEventProducer userEventProducer) {
         this.userRepository = userRepository;
-        this.kafkaTemplate = kafkaTemplate;
+        this.userEventProducer = userEventProducer;
     }
 
     public List<UserDTO> getAllUsers() {
@@ -41,7 +41,7 @@ public class UserService {
         user.setAge(request.age());
         User saved = userRepository.save(user);
 
-        kafkaTemplate.send("user-events", new UserEvent(user.getEmail(), UserEvent.ACTION_CREATE));
+        userEventProducer.sendUserEvent(user.getEmail(), UserEvent.CREATE);
 
         return toDto(saved);
     }
@@ -84,7 +84,7 @@ public class UserService {
                 .orElseThrow(() -> new UserNotFoundException(id));
         userRepository.deleteById(id);
 
-        kafkaTemplate.send("user-events", new UserEvent(user.getEmail(), UserEvent.ACTION_DELETE));
+        userEventProducer.sendUserEvent(user.getEmail(), UserEvent.DELETE);
     }
 
     private UserDTO toDto(User user) {

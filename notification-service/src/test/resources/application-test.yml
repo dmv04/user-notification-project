@@ -1,0 +1,33 @@
+spring:
+  mail:
+    host: localhost
+    port: 3025
+    username: test@mail.ru
+    password: password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: false
+        debug: true
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: test-email-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.type.mapping: "userEvent:dev.dmv04.notificationservice.dto.UserEvent"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+logging:
+  level:
+    org.springframework.kafka: DEBUG
+    org.springframework.mail: DEBUG
+    com.icegreen.greenmail: DEBUG
