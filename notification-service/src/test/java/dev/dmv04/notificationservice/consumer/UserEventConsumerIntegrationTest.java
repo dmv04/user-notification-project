@@ -1,4 +1,4 @@
-package dev.dmv04.notificationservice;
+package dev.dmv04.notificationservice.consumer;
 
 import com.icegreen.greenmail.store.FolderException;
 import dev.dmv04.notificationservice.dto.UserEvent;
@@ -35,7 +35,7 @@ import static org.awaitility.Awaitility.await;
         }
 )
 @DirtiesContext
-class NotificationIntegrationTest {
+class UserEventConsumerIntegrationTest {
 
     @Autowired
     private KafkaTemplate<String, UserEvent> kafkaTemplate;
@@ -64,8 +64,8 @@ class NotificationIntegrationTest {
     }
 
     @Test
-    void shouldReceiveCreateEventAndSendEmail() {
-        String testEmail = "user1@example.com";
+    void shouldProcessCreateEventAndSendWelcomeEmail() {
+        String testEmail = "newuser@example.com";
         UserEvent event = new UserEvent(testEmail, UserEvent.CREATE);
 
         kafkaTemplate.send("user-events", event);
@@ -79,13 +79,13 @@ class NotificationIntegrationTest {
                     assertThat(message.getSubject()).isEqualTo("Уведомление о вашем аккаунте");
                     assertThat(message.getContent().toString())
                             .contains("аккаунт на сайте example.com был успешно создан");
-                    assertThat(message.getAllRecipients()[0].toString()).hasToString(testEmail);
+                    assertThat(message.getAllRecipients()[0].toString()).isEqualTo(testEmail);
                 });
     }
 
     @Test
-    void shouldReceiveDeleteEventAndSendEmail() {
-        String testEmail = "user2@example.com";
+    void shouldProcessDeleteEventAndSendGoodbyeEmail() {
+        String testEmail = "deleteduser@example.com";
         UserEvent event = new UserEvent(testEmail, UserEvent.DELETE);
 
         kafkaTemplate.send("user-events", event);
@@ -94,31 +94,82 @@ class NotificationIntegrationTest {
                 .untilAsserted(() -> {
                     MimeMessage[] messages = greenMail.getReceivedMessages();
                     assertThat(messages).hasSize(1);
-                    assertThat(messages[0].getContent().toString())
+
+                    MimeMessage message = messages[0];
+                    assertThat(message.getSubject()).isEqualTo("Уведомление о вашем аккаунте");
+                    assertThat(message.getContent().toString())
                             .contains("Ваш аккаунт был удалён");
-                    assertThat(messages[0].getAllRecipients()[0].toString()).hasToString(testEmail);
+                    assertThat(message.getAllRecipients()[0].toString()).isEqualTo(testEmail);
                 });
     }
 
     @Test
-    void shouldSendMultipleEmailsForMultipleEvents() {
-        UserEvent event1 = new UserEvent("user3@example.com", UserEvent.CREATE);
-        UserEvent event2 = new UserEvent("user4@example.com", UserEvent.CREATE);
+    void shouldHandleMultipleEventsConcurrently() {
+        UserEvent event1 = new UserEvent("user1@example.com", UserEvent.CREATE);
+        UserEvent event2 = new UserEvent("user2@example.com", UserEvent.DELETE);
+        UserEvent event3 = new UserEvent("user3@example.com", UserEvent.CREATE);
 
         kafkaTemplate.send("user-events", event1);
         kafkaTemplate.send("user-events", event2);
+        kafkaTemplate.send("user-events", event3);
+
+        await().atMost(15, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    MimeMessage[] messages = greenMail.getReceivedMessages();
+                    assertThat(messages).hasSize(3);
+
+                    String[] recipients = new String[3];
+                    for (int i = 0; i < messages.length; i++) {
+                        recipients[i] = messages[i].getAllRecipients()[0].toString();
+                    }
+
+                    assertThat(recipients).containsExactlyInAnyOrder(
+                            "user1@example.com",
+                            "user2@example.com",
+                            "user3@example.com"
+                    );
+                });
+    }
+
+    @Test
+    void shouldProcessEventsWithDifferentEmailFormats() {
+        String[] testEmails = {
+                "simple@example.com",
+                "user.with.dots@example.com",
+                "user+tag@example.com",
+                "user_name@example.com"
+        };
+
+        for (String email : testEmails) {
+            kafkaTemplate.send("user-events", new UserEvent(email, UserEvent.CREATE));
+        }
 
         await().atMost(10, TimeUnit.SECONDS)
                 .untilAsserted(() -> {
                     MimeMessage[] messages = greenMail.getReceivedMessages();
-                    assertThat(messages).hasSize(2);
+                    assertThat(messages).hasSize(testEmails.length);
 
-                    String recipient1 = messages[0].getAllRecipients()[0].toString();
-                    String recipient2 = messages[1].getAllRecipients()[0].toString();
+                    String[] recipients = new String[messages.length];
+                    for (int i = 0; i < messages.length; i++) {
+                        recipients[i] = messages[i].getAllRecipients()[0].toString();
+                    }
 
-                    assertThat(recipient1).isIn("user3@example.com", "user4@example.com");
-                    assertThat(recipient2).isIn("user3@example.com", "user4@example.com");
-                    assertThat(recipient1).isNotEqualTo(recipient2);
+                    assertThat(recipients).containsExactlyInAnyOrder(testEmails);
+                });
+    }
+
+    @Test
+    void shouldHandleEmptyOrNullEventsGracefully() {
+        UserEvent emptyEmailEvent = new UserEvent("", UserEvent.CREATE);
+        UserEvent nullEmailEvent = new UserEvent(null, UserEvent.DELETE);
+
+        kafkaTemplate.send("user-events", emptyEmailEvent);
+        kafkaTemplate.send("user-events", nullEmailEvent);
+
+        await().atMost(5, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    MimeMessage[] messages = greenMail.getReceivedMessages();
+                    assertThat(messages).hasSize(0);
                 });
     }
 }

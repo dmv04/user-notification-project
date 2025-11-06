@@ -1,4 +1,4 @@
-package dev.dmv04.userservice;
+package dev.dmv04.userservice.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.dmv04.userservice.config.TestConfig;
