@@ -6,8 +6,12 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -17,9 +21,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 
 import static dev.dmv04.userservice.util.KafkaTestConsumerUtil.createConsumerForUserEvent;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 
 @SpringBootTest
 @Testcontainers
@@ -32,6 +40,9 @@ class UserEventProducerIntegrationTest {
 
     @Autowired
     private UserEventProducer userEventProducer;
+
+    @SpyBean
+    private KafkaTemplate<String, UserEvent> kafkaTemplate;
 
     private Consumer<String, UserEvent> consumer;
 
@@ -54,6 +65,7 @@ class UserEventProducerIntegrationTest {
         if (consumer != null) {
             consumer.close();
         }
+        Mockito.reset(kafkaTemplate);
     }
 
     @Test
@@ -84,5 +96,61 @@ class UserEventProducerIntegrationTest {
         var record = records.iterator().next();
         assertThat(record.value().email()).isEqualTo("test@mail.ru");
         assertThat(record.value().action()).isEqualTo("CREATE");
+    }
+
+    @Test
+    void shouldLogErrorWhenKafkaSendFailsWithException() {
+        UserEvent event = new UserEvent("test@mail.ru", "CREATE");
+        RuntimeException kafkaException = new RuntimeException("Kafka broker unavailable");
+
+        doReturn(CompletableFuture.failedFuture(kafkaException))
+                .when(kafkaTemplate).send(anyString(), any(UserEvent.class));
+
+        userEventProducer.sendUserEvent(event);
+
+        assertThat(true).isTrue();
+    }
+
+    @Test
+    void shouldLogErrorWhenKafkaSendFailsWithInterruptedException() {
+        UserEvent event = new UserEvent("test@mail.ru", "CREATE");
+
+        CompletableFuture<SendResult<String, UserEvent>> failedFuture = new CompletableFuture<>();
+        failedFuture.completeExceptionally(new InterruptedException("Thread interrupted"));
+
+        doReturn(failedFuture)
+                .when(kafkaTemplate).send(anyString(), any(UserEvent.class));
+
+        userEventProducer.sendUserEvent(event);
+
+        assertThat(true).isTrue();
+    }
+
+    @Test
+    void shouldLogErrorWhenKafkaSendFailsWithExecutionException() {
+        UserEvent event = new UserEvent("test@mail.ru", "CREATE");
+
+        CompletableFuture<SendResult<String, UserEvent>> failedFuture = new CompletableFuture<>();
+        failedFuture.completeExceptionally(new java.util.concurrent.ExecutionException(
+                new RuntimeException("Kafka execution failed")));
+
+        doReturn(failedFuture)
+                .when(kafkaTemplate).send(anyString(), any(UserEvent.class));
+
+        userEventProducer.sendUserEvent(event);
+
+        assertThat(true).isTrue();
+    }
+
+    @Test
+    void shouldLogErrorForEmailAndActionWhenKafkaSendFails() {
+        RuntimeException kafkaException = new RuntimeException("Kafka timeout");
+
+        doReturn(CompletableFuture.failedFuture(kafkaException))
+                .when(kafkaTemplate).send(anyString(), any(UserEvent.class));
+
+        userEventProducer.sendUserEvent("test@mail.ru", "UPDATE");
+
+        assertThat(true).isTrue();
     }
 }

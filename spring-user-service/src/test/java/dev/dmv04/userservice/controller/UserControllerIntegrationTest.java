@@ -1,5 +1,6 @@
 package dev.dmv04.userservice.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.dmv04.userservice.config.TestConfig;
 import dev.dmv04.userservice.dto.CreateUserRequest;
@@ -56,8 +57,11 @@ class UserControllerIntegrationTest {
 
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$.length()").value(1));
+                .andExpect(jsonPath("$._embedded.userDTOList").isArray())
+                .andExpect(jsonPath("$._embedded.userDTOList.length()").value(1))
+                .andExpect(jsonPath("$._embedded.userDTOList[0].name").value("Alice"))
+                .andExpect(jsonPath("$._embedded.userDTOList[0].email").value("alice@test.com"))
+                .andExpect(jsonPath("$._embedded.userDTOList[0].age").value(30));
     }
 
     @Test
@@ -73,7 +77,7 @@ class UserControllerIntegrationTest {
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request2)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -95,26 +99,102 @@ class UserControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("New"))
                 .andExpect(jsonPath("$.email").value("new@test.com"))
-                .andExpect(jsonPath("$.age").value(50));
+                .andExpect(jsonPath("$.age").value(50))
+                .andExpect(jsonPath("$._links.self.href").exists())
+                .andExpect(jsonPath("$._links.update.href").exists())
+                .andExpect(jsonPath("$._links.delete.href").exists())
+                .andExpect(jsonPath("$._links.all-users.href").exists())
+                .andExpect(jsonPath("$._links.create-user.href").exists());
+
     }
 
     @Test
     void deleteUser_shouldRemoveUser() throws Exception {
         CreateUserRequest request = new CreateUserRequest("ToDelete", "del@test.com", 33);
-        var result = mockMvc.perform(post("/api/users")
+
+        var createResult = mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andReturn();
 
-        Long userId = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+        String responseBody = createResult.getResponse().getContentAsString();
+        JsonNode jsonNode = objectMapper.readTree(responseBody);
+        Long userId = jsonNode.get("id").asLong();
+
+        mockMvc.perform(get("/api/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._embedded.userDTOList").exists())
+                .andExpect(jsonPath("$._embedded.userDTOList").isArray())
+                .andExpect(jsonPath("$._embedded.userDTOList.length()").value(1))
+                .andExpect(jsonPath("$._embedded.userDTOList[0].id").value(userId.intValue()));
 
         mockMvc.perform(delete("/api/users/" + userId))
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$._links.self.href").exists())
+                .andExpect(jsonPath("$._links.create-user.href").exists())
+                .andExpect(jsonPath("$._embedded.userDTOList").doesNotExist());
+    }
+
+    @Test
+    void getAllUsers_shouldReturnCorrectHateoasLinks() throws Exception {
+        CreateUserRequest user1 = new CreateUserRequest("User1", "user1@test.com", 25);
+        CreateUserRequest user2 = new CreateUserRequest("User2", "user2@test.com", 30);
+
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(user1)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(user2)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._links.self.href").exists())
+                .andExpect(jsonPath("$._links.create-user.href").exists())
+
+                .andExpect(jsonPath("$._embedded.userDTOList").isArray())
+                .andExpect(jsonPath("$._embedded.userDTOList.length()").value(2))
+
+                .andExpect(jsonPath("$._embedded.userDTOList[0]._links.self.href").exists())
+                .andExpect(jsonPath("$._embedded.userDTOList[0]._links.update.href").exists())
+                .andExpect(jsonPath("$._embedded.userDTOList[0]._links.delete.href").exists())
+
+                .andExpect(jsonPath("$._embedded.userDTOList[1]._links.self.href").exists())
+                .andExpect(jsonPath("$._embedded.userDTOList[1]._links.update.href").exists())
+                .andExpect(jsonPath("$._embedded.userDTOList[1]._links.delete.href").exists());
+    }
+
+    @Test
+    void getUserById_shouldReturnCorrectHateoasLinks() throws Exception {
+        CreateUserRequest request = new CreateUserRequest("TestUser", "test@test.com", 28);
+
+        var createResult = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String responseBody = createResult.getResponse().getContentAsString();
+        JsonNode jsonNode = objectMapper.readTree(responseBody);
+        Long userId = jsonNode.get("id").asLong();
+
+        mockMvc.perform(get("/api/users/" + userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId.intValue()))
+                .andExpect(jsonPath("$.name").value("TestUser"))
+                .andExpect(jsonPath("$.email").value("test@test.com"))
+                .andExpect(jsonPath("$.age").value(28))
+
+                .andExpect(jsonPath("$._links.self.href").exists())
+                .andExpect(jsonPath("$._links.update.href").exists())
+                .andExpect(jsonPath("$._links.delete.href").exists())
+                .andExpect(jsonPath("$._links.all-users.href").exists());
     }
 }

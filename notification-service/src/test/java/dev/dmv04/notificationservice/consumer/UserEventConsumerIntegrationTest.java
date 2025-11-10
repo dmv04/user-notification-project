@@ -26,14 +26,7 @@ import static org.awaitility.Awaitility.await;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@EmbeddedKafka(
-        topics = {"user-events"},
-        partitions = 1,
-        brokerProperties = {
-                "listeners=PLAINTEXT://localhost:9092",
-                "port=9092"
-        }
-)
+@EmbeddedKafka(topics = {"user-events"}, partitions = 1)
 @DirtiesContext
 class UserEventConsumerIntegrationTest {
 

@@ -27,7 +27,9 @@ public class UserService {
     }
 
     public List<UserDTO> getAllUsers() {
-        return userRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
+        return userRepository.findAllByOrderByIdAsc().stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
     }
 
     @Transactional

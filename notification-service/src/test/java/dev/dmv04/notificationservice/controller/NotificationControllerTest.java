@@ -13,8 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(NotificationController.class)
 class NotificationControllerTest {
@@ -36,10 +35,31 @@ class NotificationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(event)))
                 .andExpect(status().isOk())
-                .andExpect(content().string("Notification sent to test@mail.ru"));
+                .andExpect(jsonPath("$._links").exists())
+                .andExpect(jsonPath("$._links.self").exists())
+                .andExpect(jsonPath("$._links.self.href").exists());
 
         verify(emailNotificationService).sendNotification(event);
     }
+
+    @Test
+    void shouldSendNotificationWithCorrectHateoasLinks() throws Exception {
+        UserEvent event = new UserEvent("verchenko.d.s@mail.ru", "DELETE");
+
+        mockMvc.perform(post("/api/notifications/send")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(event)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Notification for DELETE action sent to verchenko.d.s@mail.ru"))
+                .andExpect(jsonPath("$._links").isMap())
+                .andExpect(jsonPath("$._links.self").isMap())
+                .andExpect(jsonPath("$._links.self.href").isString())
+                .andExpect(jsonPath("$._links").value(org.hamcrest.Matchers.hasKey("self")))
+                .andExpect(jsonPath("$._links").value(org.hamcrest.Matchers.aMapWithSize(1)));
+
+        verify(emailNotificationService).sendNotification(event);
+    }
+
 
     @Test
     void shouldHandleServiceException() throws Exception {

@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  description: API for sending email notifications
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081
+description: Локальный сервер
+
+tags:
+  - name: notification-controller
+    description: Отправка сообщений на почту
+
+paths:
+  /api/notifications/send:
+      post:
+        summary: Отправляет сообщения на почту
+        description: Отправляет сообщения на почту в зависимости от event
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEvent'
+              examples:
+                default:
+                  value:
+                    email: "verchenko.d.s@mail.ru"
+                    action: "CREATE"
+        responses:
+          '200':
+            description: Success
