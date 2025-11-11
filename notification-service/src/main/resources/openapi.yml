@@ -5,7 +5,7 @@ info:
   version: 1.0.0
 servers:
   - url: http://localhost:8081
-description: Локальный сервер
+    description: Локальный сервер
 
 tags:
   - name: notification-controller
@@ -13,20 +13,100 @@ tags:
 
 paths:
   /api/notifications/send:
-      post:
-        summary: Отправляет сообщения на почту
-        description: Отправляет сообщения на почту в зависимости от event
-        requestBody:
-          required: true
+    post:
+      summary: Отправляет сообщения на почту
+      description: Отправляет сообщения на почту в зависимости от event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, action]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "verchenko.d.s@mail.ru"
+                action:
+                  type: string
+                  enum: [CREATE, DELETE]
+                  example: "CREATE"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/hal+json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Notification for CREATE action sent to verchenko.d.s@mail.ru"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2025-11-11T14:30:00"
+                  service:
+                    type: string
+                    example: "email-notification"
+                additionalProperties:
+                  type: object
+
+        '400':
+          description: Ошибки валидации запроса (некорректный email, недопустимое значение action и т.д.)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserEvent'
-              examples:
-                default:
-                  value:
-                    email: "verchenko.d.s@mail.ru"
-                    action: "CREATE"
-        responses:
-          '200':
-            description: Success
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Validation failed"
+                  message:
+                    type: string
+                    example: "Action must be either 'CREATE' or 'DELETE'"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  details:
+                    type: object
+                    additionalProperties:
+                      type: string
+                required: [error, timestamp]
+
+        '503':
+          description: Ошибка отправки письма (например, недоступен SMTP-сервер)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Email delivery failed"
+                  message:
+                    type: string
+                    example: "SMTP connection refused"
+                  timestamp:
+                    type: string
+                    format: date-time
+                required: [error, timestamp]
+
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal server error"
+                  message:
+                    type: string
+                    example: "Unexpected runtime exception"
+                  timestamp:
+                    type: string
+                    format: date-time
+                required: [error, timestamp]

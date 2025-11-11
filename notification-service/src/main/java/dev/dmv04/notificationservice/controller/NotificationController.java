@@ -2,6 +2,7 @@ package dev.dmv04.notificationservice.controller;
 
 import dev.dmv04.notificationservice.dto.UserEvent;
 import dev.dmv04.notificationservice.service.EmailNotificationService;
+import jakarta.validation.Valid;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,7 +28,7 @@ public class NotificationController {
     }
 
     @PostMapping("/send")
-    public ResponseEntity<EntityModel<Map<String, Object>>> sendNotification(@RequestBody UserEvent event) {
+    public ResponseEntity<EntityModel<Map<String, Object>>> sendNotification(@Valid @RequestBody UserEvent event) {
         emailNotificationService.sendNotification(event);
 
         Map<String, Object> response = new HashMap<>();
