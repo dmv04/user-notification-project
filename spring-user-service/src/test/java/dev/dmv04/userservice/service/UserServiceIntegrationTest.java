@@ -8,12 +8,14 @@ import dev.dmv04.userservice.exception.EmailAlreadyExistsException;
 import dev.dmv04.userservice.exception.UserNotFoundException;
 import dev.dmv04.userservice.repository.UserRepository;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.KafkaContainer;
@@ -30,7 +32,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @Testcontainers
-class UserServiceKafkaIntegrationTest {
+@ActiveProfiles("test")
+class UserServiceIntegrationTest {
 
     @Container
     static final KafkaContainer kafka = new KafkaContainer(
@@ -53,7 +56,7 @@ class UserServiceKafkaIntegrationTest {
     }
 
     @BeforeEach
-    void cleanDatabase() {
+    void setUp() {
         userRepository.deleteAll();
     }
 
@@ -98,6 +101,65 @@ class UserServiceKafkaIntegrationTest {
             var record = deleteRecords.iterator().next();
             assertThat(record.value().email()).isEqualTo("test@example.com");
             assertThat(record.value().action()).isEqualTo("DELETE");
+        }
+    }
+
+    @Test
+    void shouldCreateUserSuccessfullyWithCircuitBreaker() {
+        CreateUserRequest request = new CreateUserRequest("Test User", "test@example.com", 25);
+
+        UserDTO user = userService.createUser(request);
+
+        assertThat(user).isNotNull();
+        assertThat(user.name()).isEqualTo("Test User");
+        assertThat(user.email()).isEqualTo("test@example.com");
+        assertThat(user.age()).isEqualTo(25);
+        assertThat(user.createdAt()).isNotNull();
+    }
+
+    @Test
+    void shouldDeleteUserSuccessfullyWithCircuitBreaker() {
+        String topic = "user-events";
+        String uniqueEmail = "delete-test-" + System.currentTimeMillis() + "@example.com";
+
+        CreateUserRequest createRequest = new CreateUserRequest("Test User", uniqueEmail, 25);
+        UserDTO createdUser = userService.createUser(createRequest);
+
+        try (Consumer<String, UserEvent> consumer = createConsumerForUserEvent(kafka, topic)) {
+            ConsumerRecords<String, UserEvent> createRecords =
+                    KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(10));
+
+            boolean createEventFound = false;
+            for (ConsumerRecord<String, UserEvent> record : createRecords) {
+                if (record.value().email().equals(uniqueEmail) &&
+                        record.value().action().equals("CREATE")) {
+                    createEventFound = true;
+                    break;
+                }
+            }
+            assertThat(createEventFound).isTrue();
+        }
+
+        userService.deleteUser(createdUser.id());
+
+        assertThat(userRepository.findById(createdUser.id())).isEmpty();
+
+        try (Consumer<String, UserEvent> deleteConsumer = createConsumerForUserEvent(kafka, topic)) {
+            ConsumerRecords<String, UserEvent> allRecords =
+                    KafkaTestUtils.getRecords(deleteConsumer, Duration.ofSeconds(15));
+
+            assertThat(allRecords).isNotEmpty();
+
+            boolean deleteEventFound = false;
+            for (ConsumerRecord<String, UserEvent> record : allRecords) {
+                if (record.value().email().equals(uniqueEmail) &&
+                        record.value().action().equals("DELETE")) {
+                    deleteEventFound = true;
+                    break;
+                }
+            }
+
+            assertThat(deleteEventFound).as("Should find DELETE event for email: " + uniqueEmail).isTrue();
         }
     }
 

@@ -1,6 +1,8 @@
 spring:
-  kafka:
-    bootstrap-servers: localhost:9092
+  application:
+    name: notification-service
+  config:
+    import: "optional:configserver:http://localhost:8888"
 
   mail:
     host: smtp.mail.ru
@@ -13,14 +15,3 @@ spring:
           auth: true
           starttls:
             enable: true
-
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-    enabled: true
-  swagger-ui:
-    path: /swagger-ui.html
-    enabled: true
-
-server:
-  port: 8081

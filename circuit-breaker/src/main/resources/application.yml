@@ -1,5 +1,5 @@
 spring:
   application:
-    name: user-service
+    name: circuit-breaker
   config:
     import: "optional:configserver:http://localhost:8888"

@@ -1,0 +1,34 @@
+  spring:
+    application:
+      name: config-server
+    cloud:
+      config:
+        server:
+          git:
+            uri: https://github.com/dmv04/user-notification-config
+            default-label: main
+            search-paths:
+              - '{application}'
+              - '{application}/*'
+              - circuit-breaker
+            force-pull: true
+
+  springdoc:
+    api-docs:
+      path: /v3/api-docs
+      enabled: true
+    swagger-ui:
+      path: /swagger-ui.html
+      enabled: true
+    info:
+      title: "User Service API"
+      description: "Microservice for user management"
+      version: "1.0.0"
+
+  server:
+    port: 8888
+
+  logging:
+    level:
+      org.springframework.cloud.config.server: DEBUG
+      org.springframework.boot.env: DEBUG
