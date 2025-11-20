@@ -252,7 +252,6 @@ public class UserController {
     }
 
     @GetMapping("/error-test/500")
-    @Operation(summary = "Тест 500 ошибки", description = "Всегда возвращает 500 ошибку для тестирования Circuit Breaker")
     public ResponseEntity<Map<String, String>> test500Error() {
         Map<String, String> errorResponse = new HashMap<>();
         errorResponse.put("error", "Internal Server Error");

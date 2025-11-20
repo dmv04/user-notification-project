@@ -18,6 +18,7 @@ import com.icegreen.greenmail.junit5.GreenMailExtension;
 import com.icegreen.greenmail.util.ServerSetupTest;
 
 import jakarta.mail.internet.MimeMessage;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.concurrent.TimeUnit;
 
@@ -25,7 +26,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 @SpringBootTest
-@ActiveProfiles("test")
+@TestPropertySource(properties = {
+        "spring.config.location=classpath:application-test.yml",
+        "spring.mail.host=localhost",
+        "spring.mail.port=3025",
+        "spring.cloud.config.enabled=false"
+})
 @EmbeddedKafka(topics = {"user-events"}, partitions = 1)
 @DirtiesContext
 class UserEventConsumerIntegrationTest {

@@ -17,6 +17,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @TestPropertySource(locations = "classpath:application-test.yml")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@TestPropertySource(properties = {
+        "spring.cloud.config.enabled=false"
+})
 class UserRepositoryTest {
 
     @Autowired

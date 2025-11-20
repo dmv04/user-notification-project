@@ -13,10 +13,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @EnableConfigurationProperties(ServiceConfiguration.class)
 @TestPropertySource(properties = {
-        "services.services.user-service.url=http://localhost:8081",
+        "spring.cloud.config.enabled=false",
+        "spring.config.import=optional:file:./",
+        "eureka.client.enabled=false",
+        "services.services.notification-service.timeout=3000",
         "services.services.user-service.timeout=5000",
-        "services.services.notification-service.url=http://localhost:8082",
-        "services.services.notification-service.timeout=3000"
+        "services.services.user-service.url=http://localhost:8081",
+        "services.services.notification-service.url=http://localhost:8082"
 })
 class ServiceConfigurationTest {
 

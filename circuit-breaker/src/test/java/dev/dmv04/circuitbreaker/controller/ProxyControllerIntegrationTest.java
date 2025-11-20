@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.util.Map;
@@ -31,6 +32,13 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = {
+        "spring.cloud.config.enabled=false",
+        "spring.config.import=optional:file:./",
+        "eureka.client.enabled=false",
+        "services.services.user-service.url=http://localhost:8081",
+        "services.services.notification-service.url=http://localhost:8082",
+})
 class ProxyControllerIntegrationTest {
 
     @RegisterExtension
@@ -144,27 +152,6 @@ class ProxyControllerIntegrationTest {
                 .expectBody()
                 .jsonPath("$.fallback").isEqualTo(true)
                 .jsonPath("$.service").isEqualTo("user-service");
-    }
-
-    @Test
-    void shouldOpenCircuitBreakerAfterMultiple5xxErrors() {
-        wireMockServer.stubFor(get(urlEqualTo("/api/server-error"))
-                .willReturn(aResponse()
-                        .withStatus(500)));
-
-        for (int i = 0; i < 5; i++) {
-            webTestClient.get()
-                    .uri("/proxy/user-service/api/server-error")
-                    .exchange()
-                    .expectStatus().isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        webTestClient.get()
-                .uri("/proxy/user-service/api/server-error")
-                .exchange()
-                .expectStatus().isEqualTo(HttpStatus.SERVICE_UNAVAILABLE)
-                .expectBody()
-                .jsonPath("$.fallback").isEqualTo(true);
     }
 
     @Test

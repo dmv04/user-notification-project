@@ -15,6 +15,7 @@ import org.springframework.kafka.support.SendResult;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -31,6 +32,9 @@ import static org.mockito.Mockito.doReturn;
 
 @SpringBootTest
 @Testcontainers
+@TestPropertySource(properties = {
+        "spring.cloud.config.enabled=false"
+})
 class UserEventProducerIntegrationTest {
 
     @Container
