@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # =============== Database ===============
   postgres:
     image: postgres:15-alpine
     environment:
@@ -15,7 +14,6 @@ services:
     networks:
       - notification-net
 
-  # =============== Kafka ===============
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.0
     environment:
@@ -38,7 +36,6 @@ services:
     networks:
       - notification-net
 
-  # =============== Config Server ===============
   config-server:
     build: ./config-server
     ports:
@@ -52,7 +49,6 @@ services:
       retries: 15
       start_period: 45s
 
-  # =============== Discovery Server ===============
   discovery-server:
     build: ./discovery-server
     ports:
@@ -63,9 +59,7 @@ services:
       config-server:
         condition: service_healthy
     environment:
-      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
-      EUREKA_CLIENT_REGISTER_WITH_EUREKA: ${EUREKA_CLIENT_REGISTER_WITH_EUREKA}
-      EUREKA_CLIENT_FETCH_REGISTRY: ${EUREKA_CLIENT_FETCH_REGISTRY}
+      SPRING_CLOUD_CONFIG_URI: ${SPRING_CLOUD_CONFIG_URI}
     healthcheck:
       test: [ "CMD-SHELL", "timeout 5 bash -c ':> /dev/tcp/localhost/8761' || exit 1" ]
       interval: 10s
@@ -73,7 +67,6 @@ services:
       retries: 8
       start_period: 35s
 
-  # =============== API Gateway ===============
   api-gateway:
     build: ./api-gateway
     ports:
@@ -87,7 +80,6 @@ services:
         condition: service_healthy
     environment:
       SPRING_CLOUD_CONFIG_URI: ${SPRING_CLOUD_CONFIG_URI}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE}
     healthcheck:
       test: [ "CMD-SHELL", "timeout 5 bash -c ':> /dev/tcp/localhost/8083' || exit 1" ]
       interval: 10s
@@ -95,7 +87,6 @@ services:
       retries: 8
       start_period: 25s
 
-  # =============== User Service ===============
   user-service:
     build: ./spring-user-service
     ports:
@@ -109,12 +100,6 @@ services:
         condition: service_healthy
     environment:
       SPRING_CLOUD_CONFIG_URI: ${SPRING_CLOUD_CONFIG_URI}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE}
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
-      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO}
     healthcheck:
       test: [ "CMD-SHELL", "timeout 5 bash -c ':> /dev/tcp/localhost/8081' || exit 1" ]
       interval: 10s
@@ -122,7 +107,6 @@ services:
       retries: 8
       start_period: 25s
 
-  # =============== Notification Service ===============
   notification-service:
     build: ./notification-service
     ports:
@@ -135,13 +119,11 @@ services:
       discovery-server:
         condition: service_healthy
     environment:
-      SPRING_CLOUD_CONFIG_URI: ${SPRING_CLOUD_CONFIG_URI}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE}
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
       SPRING_MAIL_HOST: ${MAIL_HOST}
       SPRING_MAIL_PORT: ${MAIL_PORT}
       SPRING_MAIL_USERNAME: ${MAIL_USERNAME}
       SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD}
+      SPRING_CLOUD_CONFIG_URI: ${SPRING_CLOUD_CONFIG_URI}
     healthcheck:
       test: [ "CMD-SHELL", "timeout 5 bash -c ':> /dev/tcp/localhost/8082' || exit 1" ]
       interval: 10s
@@ -149,7 +131,6 @@ services:
       retries: 8
       start_period: 25s
 
-  # =============== Circuit Breaker ===============
   circuit-breaker:
     build: ./circuit-breaker
     ports:
@@ -166,11 +147,7 @@ services:
       notification-service:
         condition: service_healthy
     environment:
-      SPRING_APPLICATION_NAME: ${SPRING_APPLICATION_NAME_CIRCUIT_BREAKER}
       SPRING_CLOUD_CONFIG_URI: ${SPRING_CLOUD_CONFIG_URI}
-      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE}
-      SERVICES_SERVICES_USER_SERVICE_URL: ${SERVICES_SERVICES_USER_SERVICE_URL}
-      SERVICES_SERVICES_NOTIFICATION_SERVICE_URL: ${SERVICES_SERVICES_NOTIFICATION_SERVICE_URL}
     healthcheck:
       test: [ "CMD-SHELL", "timeout 5 bash -c ':> /dev/tcp/localhost/8084' || exit 1" ]
       interval: 10s
@@ -178,7 +155,6 @@ services:
       retries: 8
       start_period: 25s
 
-# =============== Volumes & Networks ===============
 volumes:
   postgres_data:
 
